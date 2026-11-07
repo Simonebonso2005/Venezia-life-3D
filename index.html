@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Venezia Life 3D — Deluxe Prototype</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#09131b;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+#game{width:100%;height:100%;display:block}
+#hud{position:fixed;inset:10px 10px auto 10px;z-index:10;display:flex;gap:7px;flex-wrap:wrap}
+.pill{background:linear-gradient(180deg,#101b26dd,#071017dd);border:1px solid #ffffff22;box-shadow:0 5px 20px #0008;backdrop-filter:blur(12px);color:#fff;padding:8px 11px;border-radius:14px;font-size:11px}
+#brand{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:10;color:#fff;font-weight:900;letter-spacing:2px;font-size:13px;text-shadow:0 3px 15px #000}
+#msg{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:20;background:#071017e8;border:1px solid #ffffff22;box-shadow:0 8px 35px #0009;color:#fff;padding:11px 15px;border-radius:15px;opacity:0;transition:.2s;text-align:center;max-width:90%;font-size:12px}
+#left{position:fixed;left:18px;bottom:20px;width:155px;height:155px;z-index:10}
+.btn{position:absolute;width:50px;height:50px;border:1px solid #ffffff20;border-radius:17px;background:#071017bb;color:#fff;font-size:21px;box-shadow:0 6px 20px #0008}
+.u{left:52px}.d{left:52px;bottom:0}.l{left:0;top:52px}.r{right:0;top:52px}
+#right{position:fixed;right:18px;bottom:25px;z-index:10;display:flex;gap:9px;align-items:flex-end}
+.act{width:65px;height:65px;border:1px solid #ffffff25;border-radius:50%;background:#071017d9;color:#fff;font-size:10px;font-weight:900;box-shadow:0 7px 22px #0009}
+.act.main{width:76px;height:76px;background:#fff;color:#071017}
+#mini{position:fixed;right:14px;top:62px;width:145px;height:95px;border:1px solid #ffffff20;border-radius:14px;background:#071017cc;z-index:10;overflow:hidden;box-shadow:0 7px 25px #0008}
+#minimap{width:100%;height:100%}
+#hint{position:fixed;left:50%;bottom:7px;transform:translateX(-50%);z-index:8;color:#ffffffaa;font-size:9px;white-space:nowrap}
+#panel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.96);width:min(420px,90vw);padding:18px;border-radius:20px;background:#071017ee;border:1px solid #ffffff25;box-shadow:0 25px 80px #000c;color:#fff;z-index:30;opacity:0;pointer-events:none;transition:.2s}
+#panel.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+#panel h2{margin:0 0 7px;font-size:19px}.close{float:right;background:#ffffff15;border:0;color:#fff;border-radius:10px;padding:6px 9px}
+.card{background:#ffffff0b;border:1px solid #ffffff12;padding:11px;border-radius:13px;margin-top:9px}
+.small{font-size:11px;color:#ffffffaa;line-height:1.5}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="brand">VENEZIA LIFE</div>
+<div id="hud">
+<div class="pill" id="money">€ 2.000</div><div class="pill" id="job">DISOCCUPATO</div>
+<div class="pill" id="energy">⚡ 100%</div><div class="pill" id="love">❤️ 0</div><div class="pill" id="clock">LUN • 08:00</div>
+</div>
+<div id="mini"><canvas id="minimap"></canvas></div>
+<div id="msg"></div>
+<div id="left">
+<button class="btn u" data-k="w">▲</button><button class="btn d" data-k="s">▼</button>
+<button class="btn l" data-k="a">◀</button><button class="btn r" data-k="d">▶</button>
+</div>
+<div id="right">
+<button class="act" id="phone">📱<br>TELEFONO</button>
+<button class="act" id="action">AZIONE</button>
+<button class="act main" id="work">LAVORO</button>
+</div>
+<div id="hint">Esplora • interagisci • lavora • costruisci la tua vita</div>
+<div id="panel"><button class="close" id="close">✕</button><h2 id="ptitle"></h2><div id="pbody"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+const canvas=document.getElementById('game');
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x8ab9ca);
+scene.fog=new THREE.Fog(0x8ab9ca,65,430);
+const camera=new THREE.PerspectiveCamera(64,innerWidth/innerHeight,.1,900);
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+scene.add(new THREE.HemisphereLight(0xc9edff,0x33433d,2.3));
+const sun=new THREE.DirectionalLight(0xfff1d2,2.8);sun.position.set(-100,150,80);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
+
+const world=420;
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(world,world),new THREE.MeshStandardMaterial({color:0xc8c1af,roughness:.96}));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+const canal=new THREE.Mesh(new THREE.PlaneGeometry(80,world),new THREE.MeshStandardMaterial({color:0x347f93,roughness:.1,metalness:.08}));
+canal.rotation.x=-Math.PI/2;canal.position.set(170,.02,0);scene.add(canal);
+
+function mat(c,rough=.7,metal=0){return new THREE.MeshStandardMaterial({color:c,roughness:rough,metalness:metal})}
+function box(x,z,w,d,h,c){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c));m.position.set(x,h/2,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m}
+function label(x,z,y,text){
+ const cc=document.createElement('canvas');cc.width=512;cc.height=100;const q=cc.getContext('2d');
+ q.fillStyle='#071017d9';q.roundRect(5,5,502,90,18);q.fill();q.fillStyle='#fff';q.font='900 42px system-ui';q.textAlign='center';q.fillText(text,256,64);
+ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cc),transparent:true}));s.scale.set(6.5,1.27,1);s.position.set(x,y,z);scene.add(s);
+}
+function road(x,z,w,d){const r=box(x,z,w,d,.06,0x34383b);return r}
+road(0,0,430,19);road(0,-90,430,13);road(0,90,430,13);road(-100,0,14,210);road(0,0,14,210);road(100,0,14,210);
+
+const buildings=[
+[-145,-145,65,52,18,0xd5b48d,'CASA'],[-45,-145,68,52,20,0xd88c58,'BAR'],[55,-145,78,52,18,0xd8db81,'SUPERMERCATO'],[150,-145,64,52,17,0x8f9aa2,'OFFICINA'],
+[-145,145,72,54,18,0xd88484,'RISTORANTE'],[-45,145,70,54,18,0xa78ed0,'NEGOZIO'],[55,145,85,54,19,0x729ec5,'AZIENDA LOGISTICA'],[155,145,70,54,20,0x755bb1,'DISCOTECA']
+];
+buildings.forEach(b=>{box(...b.slice(0,6));label(b[0],b[1],b[4]+1.4,b[6])});
+for(let x=-200;x<=200;x+=24)for(let z=-200;z<=200;z+=24){
+ if(Math.abs(x)<20||Math.abs(z)<18||Math.abs(x+100)<12||Math.abs(x-100)<12)continue;
+ if(Math.random()<.38){const h=5+Math.random()*9;box(x,z,10,10,h,0xcfc8b9)}
+}
+for(let i=0;i<18;i++){
+ const x=-190+Math.random()*350,z=-190+Math.random()*380;
+ const trunk=box(x,z,1.5,1.5,4,0x6d4c35);
+ const crown=new THREE.Mesh(new THREE.SphereGeometry(4.5,12,10),mat(0x47765d));
+ crown.position.set(x,8,z);crown.castShadow=true;scene.add(crown)
+}
+
+const player=new THREE.Group();
+const legs=new THREE.Mesh(new THREE.CapsuleGeometry(.24,.75,4,8),mat(0x20262c));legs.position.set(0,.7,0);player.add(legs);
+const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.5,1.05,5,10),mat(0x232c35));torso.position.y=1.35;torso.castShadow=true;player.add(torso);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.38,18,18),mat(0xdcae88));head.position.y=2.45;head.castShadow=true;player.add(head);
+const hair=new THREE.Mesh(new THREE.SphereGeometry(.4,18,10,0,Math.PI*2,0,Math.PI/2),mat(0x2a1b15));hair.position.y=2.6;player.add(hair);
+player.position.set(-118,0,-110);scene.add(player);
+
+function makeCar(color=0x252525){
+ const g=new THREE.Group();
+ const body=new THREE.Mesh(new THREE.BoxGeometry(3.8,.85,1.75),mat(color,.3,.55));body.position.y=.78;body.castShadow=true;g.add(body);
+ const cab=new THREE.Mesh(new THREE.BoxGeometry(2.05,.7,1.48),mat(0x18222a,.18,.35));cab.position.set(.15,1.42,0);cab.castShadow=true;g.add(cab);
+ for(const x of [-1.25,1.25])for(const z of [-.93,.93]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.36,.36,.25,18),mat(0x101010,.7));w.rotation.z=Math.PI/2;w.position.set(x,.38,z);w.castShadow=true;g.add(w)}
+ return g;
+}
+const car=makeCar(0x1f252a);car.position.set(-91,0,-110);scene.add(car);
+
+function npc(x,z,name,romantic=false){
+ const g=new THREE.Group();const body=new THREE.Mesh(new THREE.CapsuleGeometry(.42,.95,5,9),mat(romantic?0xc95778:0x3d6da1));body.position.y=.9;g.add(body);
+ const h=new THREE.Mesh(new THREE.SphereGeometry(.33,16,16),mat(0xdcae88));h.position.y=1.82;g.add(h);
+ g.position.set(x,0,z);scene.add(g);return {g,name,romantic,vx:(Math.random()-.5)*.012,vz:(Math.random()-.5)*.012};
+}
+const npcs=[npc(-5,-38,'Giulia',true),npc(105,-30,'Sara',true),npc(-82,35,'Marco'),npc(110,58,'Luca'),npc(-145,55,'Anna',true)];
+
+const state={money:2000,energy:100,love:0,job:'Disoccupato',minutes:480,day:1};
+const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+document.querySelectorAll('[data-k]').forEach(b=>{const k=b.dataset.k;const on=e=>{e.preventDefault();keys[k]=true},off=e=>{e.preventDefault();keys[k]=false};b.addEventListener('touchstart',on,{passive:false});b.addEventListener('touchend',off,{passive:false});b.addEventListener('mousedown',on);b.addEventListener('mouseup',off);b.addEventListener('mouseleave',off)});
+
+function toast(t){const e=document.getElementById('msg');e.textContent=t;e.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.opacity=0,2800)}
+function hud(){
+ document.getElementById('money').textContent='€ '+Math.max(0,Math.round(state.money)).toLocaleString('it-IT');
+ document.getElementById('job').textContent=state.job.toUpperCase();
+ document.getElementById('energy').textContent='⚡ '+Math.round(state.energy)+'%';
+ document.getElementById('love').textContent='❤️ '+state.love;
+ const h=Math.floor(state.minutes/60)%24,m=Math.floor(state.minutes%60);
+ document.getElementById('clock').textContent=`${['LUN','MAR','MER','GIO','VEN','SAB','DOM'][(state.day-1)%7]} • ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function panel(title,body){document.getElementById('ptitle').textContent=title;document.getElementById('pbody').innerHTML=body;document.getElementById('panel').classList.add('open')}
+document.getElementById('close').onclick=()=>document.getElementById('panel').classList.remove('open');
+document.getElementById('phone').onclick=()=>panel('📱 IL TUO TELEFONO',`<div class="card"><b>Saldo</b><br>€ ${Math.round(state.money).toLocaleString('it-IT')}</div><div class="card"><b>Lavoro</b><br>${state.job}</div><div class="card"><b>Relazione</b><br>❤️ ${state.love}/100</div><div class="card"><b>Obiettivo</b><br>Compra una casa migliore e costruisci la tua vita.</div>`);
+
+function nearNPC(){let best=null,bd=999;for(const n of npcs){const d=player.position.distanceTo(n.g.position);if(d<bd){bd=d;best=n}}return [best,bd]}
+document.getElementById('action').onclick=()=>{
+ const [n,nd]=nearNPC();
+ if(n&&nd<7){if(n.romantic){state.love=Math.min(100,state.love+8);state.money-=20;toast(`${n.name}: appuntamento riuscito ❤️ +8 relazione`)}else toast(`${n.name}: “Bella giornata, eh?”`);hud();return}
+ let points=[[-145,-145,'home'],[-45,-145,'bar'],[55,-145,'shop'],[150,-145,'garage'],[-145,145,'food'],[-45,145,'shop'],[55,145,'work'],[155,145,'club']];
+ let best=null,bd=999;for(const p of points){const d=Math.hypot(player.position.x-p[0],player.position.z-p[1]);if(d<bd){bd=d;best=p}}
+ if(!best||bd>10){toast('Avvicinati a un luogo o a una persona.');return}
+ const a=best[2];
+ if(a==='home'){state.energy=100;state.minutes+=60;toast('Hai riposato. Energia al 100%.')}
+ if(a==='bar'){state.money-=8;state.energy=Math.min(100,state.energy+5);state.minutes+=30;toast('Caffè al bar: -€8')}
+ if(a==='shop'){state.money-=35;state.minutes+=40;toast('Spesa fatta: -€35')}
+ if(a==='food'){state.money-=18;state.energy=Math.min(100,state.energy+15);state.minutes+=45;toast('Pranzo: -€18')}
+ if(a==='garage'){state.money-=60;state.minutes+=30;toast('Controllo auto: -€60')}
+ if(a==='work'){if(state.job==='Disoccupato'){state.job='Corriere';toast('Assunto come corriere!')}else toast('Sei già assunto come corriere.')}
+ if(a==='club'){state.money-=25;state.minutes+=90;state.love=Math.min(100,state.love+2);toast('Serata in discoteca: -€25')}
+ hud();
+};
+document.getElementById('work').onclick=()=>{
+ if(Math.hypot(player.position.x-55,player.position.z-145)>11){toast('Vai all’Azienda Logistica per lavorare.');return}
+ if(state.job==='Disoccupato'){state.job='Corriere';toast('Assunto! Premi LAVORO ancora per iniziare il turno.')}
+ else if(state.energy<20)toast('Sei stanco. Vai a casa.')
+ else{state.money+=95;state.energy-=20;state.minutes+=120;toast('Turno completato: +€95 💶')}
+ hud();
+};
+
+const mini=document.getElementById('minimap'),mc=mini.getContext('2d');
+function drawMini(){mc.clearRect(0,0,145,95);mc.fillStyle='#1c5360';mc.fillRect(0,0,145,95);mc.fillStyle='#aaa18e';mc.fillRect(0,0,120,95);
+ mc.fillStyle='#555';mc.fillRect(0,44,120,7);mc.fillRect(55,0,6,95);mc.fillStyle='#fff';mc.beginPath();mc.arc((player.position.x+210)/420*120,(player.position.z+210)/420*95,4,0,7);mc.fill();
+}
+let last=performance.now();
+function loop(now){
+ const dt=Math.min(.05,(now-last)/1000);last=now;
+ let dx=(keys.d?1:0)-(keys.a?1:0),dz=(keys.s?1:0)-(keys.w?1:0);
+ if(dx||dz){const l=Math.hypot(dx,dz);dx/=l;dz/=l;player.position.x+=dx*dt*23;player.position.z+=dz*dt*23;player.rotation.y=Math.atan2(dx,dz);state.minutes+=dt*1.25;state.energy=Math.max(0,state.energy-dt*.018)}
+ player.position.x=Math.max(-205,Math.min(205,player.position.x));player.position.z=Math.max(-205,Math.min(205,player.position.z));
+ npcs.forEach(n=>{n.g.position.x+=n.vx;n.g.position.z+=n.vz;if(Math.abs(n.g.position.x)>195)n.vx*=-1;if(Math.abs(n.g.position.z)>195)n.vz*=-1});
+ if(state.minutes>=1440){state.minutes-=1440;state.day++;state.energy=Math.min(100,state.energy+30)}
+ const target=new THREE.Vector3(player.position.x+10,8.5,player.position.z+15);camera.position.lerp(target,.075);camera.lookAt(player.position.x,1.2,player.position.z);
+ hud();drawMini();renderer.render(scene,camera);requestAnimationFrame(loop)
+}
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+hud();requestAnimationFrame(loop);
+</script>
+</body></html>
